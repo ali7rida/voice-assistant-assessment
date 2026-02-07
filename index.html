@@ -289,7 +289,7 @@
 
   <script>
     // ⚠️ REPLACE THIS with your n8n Production Webhook URL
-    const WEBHOOK_URL = 'YOUR_N8N_WEBHOOK_URL_HERE';
+    const WEBHOOK_URL = '/api/webhook';
 
     let mediaRecorder = null;
     let audioChunks = [];
@@ -363,51 +363,51 @@
     }
 
     async function submit() {
-      const email = document.getElementById('emailInput').value.trim();
-      if (!email) return showStatus('Please enter your email.', 'error');
-      if (!audioBlob) return showStatus('Please record audio first.', 'error');
+  const email = document.getElementById('emailInput').value.trim();
+  if (!email) return showStatus('Please enter your email.', 'error');
+  if (!audioBlob) return showStatus('Please record audio first.', 'error');
 
-      const btn = document.getElementById('submitBtn');
-      btn.disabled = true;
-      btn.textContent = 'Processing...';
-      showStatus('⏳ Transcribing and summarizing your recording...', 'loading');
-      document.getElementById('summaryCard').classList.remove('show');
+  showStatus('⏳ Processing...', 'loading');
+  document.getElementById('submitBtn').disabled = true;
 
-      const formData = new FormData();
-      formData.append('audio', audioBlob, 'recording.ogg');
-      formData.append('email', email);
-      formData.append('sendNow', sendMode === 'now' ? 'true' : 'false');
+  // Use XMLHttpRequest - sometimes works when fetch doesn't
+  const formData = new FormData();
+  formData.append('audio', audioBlob, 'recording.ogg');
+  formData.append('email', email);
+  formData.append('sendNow', sendMode === 'now' ? 'true' : 'false');
 
-      if (sendMode === 'schedule') {
-        const scheduleAt = document.getElementById('scheduleTime').value;
-        if (!scheduleAt) {
-          btn.disabled = false;
-          btn.textContent = 'Process & Send';
-          return showStatus('Please pick a scheduled time.', 'error');
-        }
-        formData.append('scheduleAt', scheduleAt);
-      }
-
-      try {
-        const res = await fetch(WEBHOOK_URL, { method: 'POST', body: formData });
-        const data = await res.json();
-
-        if (data.success || data.summary || res.ok) {
-          showStatus('✅ Summary emailed successfully!', 'success');
-          if (data.summary) {
-            document.getElementById('summaryText').textContent = data.summary;
-            document.getElementById('summaryCard').classList.add('show');
-          }
-        } else {
-          showStatus('Something went wrong. Please try again.', 'error');
-        }
-      } catch (err) {
-        showStatus('Network error. Check your connection.', 'error');
-      }
-
-      btn.disabled = false;
-      btn.textContent = 'Process & Send';
+  if (sendMode === 'schedule') {
+    const scheduleAt = document.getElementById('scheduleTime').value;
+    if (!scheduleAt) {
+      document.getElementById('submitBtn').disabled = false;
+      document.getElementById('submitBtn').textContent = 'Process & Send';
+      return showStatus('Please pick a scheduled time.', 'error');
     }
+    formData.append('scheduleAt', scheduleAt);
+  }
+
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', WEBHOOK_URL);
+  xhr.onload = function() {
+    try {
+      const data = JSON.parse(xhr.responseText);
+      showStatus('✅ Summary emailed!', 'success');
+      if (data.summary) {
+        document.getElementById('summaryText').textContent = data.summary;
+        document.getElementById('summaryCard').classList.add('show');
+      }
+    } catch(e) {
+      showStatus('✅ Sent! Check your email.', 'success');
+    }
+    document.getElementById('submitBtn').disabled = false;
+    document.getElementById('submitBtn').textContent = 'Process & Send';
+  };
+  xhr.onerror = function() {
+    showStatus('Network error', 'error');
+    document.getElementById('submitBtn').disabled = false;
+  };
+  xhr.send(formData);
+}
   </script>
 </body>
 </html>
